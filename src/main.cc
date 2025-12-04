@@ -1,12 +1,14 @@
 #include <boost/asio/error.hpp>
 #include <boost/system/error_code.hpp>
-#include <iostream>
-#include <thread>
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/asio/ssl/stream.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/lexical_cast.hpp>
+#include <iostream>
+#include <tuple>
+#include <thread>
+#include <cstdlib>
 
 namespace asio = boost::asio; 
 namespace ip = boost::asio::ip;
@@ -22,6 +24,34 @@ void perform_handshake () {
 }	
 # endif 
 
+
+
+std::tuple<std::string, unsigned short int> get_env_vars () {
+	std::tuple<std::string, unsigned short int> result; 
+
+	std::string host_env_var = std::string{std::getenv("MC_HOSTNAME")}; 
+	std::string port_env_var = std::string{std::getenv("MC_HOSTPORT")};  
+	if (host_env_var.length() == 0) 
+		return {}; 
+
+	try {
+		unsigned int port_number = std::stoul(port_env_var); 
+
+		if (port_number > std::numeric_limits<unsigned short>::max()) 
+			return {}; 
+		else 
+			return {host_env_var, static_cast<unsigned short int>(port_number)}; 
+	} catch (const std::out_of_range& oor) {
+        std::cerr << "Out of range error for port number: " << oor.what() << std::endl;
+		return {}; 
+    } catch (const std::invalid_argument& ia) {
+        std::cerr << "Invalid argument error for port number: " << ia.what() << std::endl;
+		return {}; 
+    }	
+
+	return result; 
+}
+
 int main (void) {
 
 	// Create a local scope
@@ -33,6 +63,21 @@ int main (void) {
 		asio::ssl::stream <ip::tcp::socket> secure_socket (io_serv, context); 
 		ip::tcp::socket& socket (secure_socket.next_layer()); 
 		bool using_tls; 
+
+		// Formats the message address to send
+		auto send_mail = [&] (const std::string& address, const std::vector<std::string>& recipients, const std::string& body) -> std::string {
+
+			if ((!address.length ()) || (!recipients.size ())) {
+				std::cerr << "Couldn't send email, either sender or recipients not provided." << std::endl; 
+				return {}; 
+			}
+			
+			// Start formatting string to send to mail server. 
+			std::string result; 	
+			
+
+			return result;
+		};
 
 		auto perform_handshake = [&]() {
 			std::string server_name = socket.remote_endpoint().address().to_string(); 	
@@ -84,10 +129,11 @@ int main (void) {
 			else perform_handshake(); 
 		};
 
-	
-		unsigned short port = 234; 	
-		std::string hostname = "somehost"; 
-		connect_to_server(hostname, port); 
+		std::tuple<std::string, unsigned short int> env_vars = get_env_vars (); 	
+		auto [hostname, port] = env_vars; 
+		std::cout << "Connected to mail server @ " <<  hostname << ":" << port << std::endl; 
+		connect_to_server (hostname, port); 
+		send_mail		
 	}
 
 	// std::cout << "EHLO" << std::endl;
